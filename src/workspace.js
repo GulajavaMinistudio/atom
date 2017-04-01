@@ -12,6 +12,7 @@ const Model = require('./model')
 const StateStore = require('./state-store')
 const TextEditor = require('./text-editor')
 const PaneContainer = require('./pane-container')
+const Pane = require('./pane')
 const Panel = require('./panel')
 const PanelContainer = require('./panel-container')
 const Task = require('./task')
@@ -749,6 +750,47 @@ module.exports = class Workspace extends Model {
     return item
   }
 
+  // Essential: Search the workspace for items matching the given URI and hide them.
+  //
+  // * `uri` (optional) A {String} containing a URI.
+  //
+  // Returns a {boolean} indicating whether any items were found (and hidden).
+  hide (uri) {
+    let foundItems = false
+
+    // If any visible item has the given URI, hide it
+    for (const container of this.getPaneContainers()) {
+      const isCenter = container === this.getCenter()
+      if (isCenter || container.isOpen()) {
+        for (const pane of container.getPanes()) {
+          const activeItem = pane.getActiveItem()
+          if (activeItem != null && typeof activeItem.getURI === 'function') {
+            const itemURI = activeItem.getURI()
+            if (itemURI === uri) {
+              foundItems = true
+              // We can't really hide the center so we just destroy the item.
+              if (isCenter) {
+                pane.destroyItem(activeItem)
+              } else {
+                container.hide()
+              }
+            }
+          }
+        }
+      }
+    }
+
+    return foundItems
+  }
+
+  // Essential: Search the workspace for items matching the given URI. If any are found, hide them.
+  // Otherwise, open the URL.
+  //
+  // * `uri` (optional) A {String} containing a URI.
+  toggle (uri) {
+    if (!this.hide(uri)) this.open(uri, {searchAllPanes: true})
+  }
+
   // Open Atom's license in the active pane.
   openLicense () {
     return this.open(path.join(process.resourcesPath, 'LICENSE.md'))
@@ -1005,7 +1047,7 @@ module.exports = class Workspace extends Model {
   // {::saveActivePaneItemAs} # will be called instead. This method does nothing
   // if the active item does not implement a `.save` method.
   saveActivePaneItem () {
-    return this.getActivePane().saveActiveItem()
+    this.getActivePane().saveActiveItem()
   }
 
   // Prompt the user for a path and save the active pane item to it.
@@ -1014,7 +1056,43 @@ module.exports = class Workspace extends Model {
   // `.saveAs` on the item with the selected path. This method does nothing if
   // the active item does not implement a `.saveAs` method.
   saveActivePaneItemAs () {
-    return this.getActivePane().saveActiveItemAs()
+    this.getActivePane().saveActiveItemAs()
+  }
+
+  getFocusedPane () {
+    let el = document.activeElement
+    while (el != null) {
+      if (typeof el.getModel === 'function') {
+        const model = el.getModel()
+        if (model instanceof Pane) return model
+      }
+      el = el.parentElement
+    }
+  }
+
+  // Save the currently focused pane item.
+  //
+  // If the focused pane item currently has a URI according to the item's
+  // `.getURI` method, calls `.save` on the item. Otherwise
+  // {::saveFocusedPaneItemAs} will be called instead. This method does nothing
+  // if the focused item does not implement a `.save` method.
+  saveFocusedPaneItem () {
+    const pane = this.getFocusedPane()
+    if (pane) {
+      pane.saveActiveItem()
+    }
+  }
+
+  // Prompt the user for a path and save the focused pane item to it.
+  //
+  // Opens a native dialog where the user selects a path on disk, then calls
+  // `.saveAs` on the item with the selected path. This method does nothing if
+  // the focused item does not implement a `.saveAs` method.
+  saveFocusedPaneItemAs () {
+    const pane = this.getFocusedPane()
+    if (pane) {
+      pane.saveActiveItemAs()
+    }
   }
 
   // Destroy (close) the active pane item.
@@ -1187,37 +1265,6 @@ module.exports = class Workspace extends Model {
 
   getPaneContainers () {
     return [this.getCenter(), ..._.values(this.docks)]
-  }
-
-  toggle (uri) {
-    let foundItems = false
-
-    // If any visible item has the given URI, hide it
-    for (const location of this.getPaneContainers()) {
-      const isCenter = location === this.getCenter()
-      if (isCenter || location.isOpen()) {
-        for (const pane of location.getPanes()) {
-          const activeItem = pane.getActiveItem()
-          if (activeItem != null && typeof activeItem.getURI === 'function') {
-            const itemURI = activeItem.getURI()
-            if (itemURI === uri) {
-              foundItems = true
-              // We can't really hide the center so we just destroy the item.
-              if (isCenter) {
-                pane.destroyItem(activeItem)
-              } else {
-                location.hide()
-              }
-            }
-          }
-        }
-      }
-    }
-
-    // If no visible items had the URI, show it.
-    if (!foundItems) {
-      this.open(uri, {searchAllPanes: true})
-    }
   }
 
   /*
