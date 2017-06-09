@@ -1340,9 +1340,9 @@ module.exports = class Workspace extends Model {
   }
 
   confirmClose (options) {
-    return this.getPaneContainers()
-      .map(container => container.confirmClose(options))
-      .every(saved => saved)
+    return Promise.all(this.getPaneContainers().map(container =>
+      container.confirmClose(options)
+    )).then((results) => !results.includes(false))
   }
 
   // Save the active pane item.
@@ -1352,7 +1352,7 @@ module.exports = class Workspace extends Model {
   // {::saveActivePaneItemAs} # will be called instead. This method does nothing
   // if the active item does not implement a `.save` method.
   saveActivePaneItem () {
-    this.getCenter().getActivePane().saveActiveItem()
+    return this.getCenter().getActivePane().saveActiveItem()
   }
 
   // Prompt the user for a path and save the active pane item to it.
@@ -1388,6 +1388,10 @@ module.exports = class Workspace extends Model {
   // Returns an {Array} of {Pane}s.
   getPanes () {
     return _.flatten(this.getPaneContainers().map(container => container.getPanes()))
+  }
+
+  getVisiblePanes () {
+    return _.flatten(this.getVisiblePaneContainers().map(container => container.getPanes()))
   }
 
   // Extended: Get the active {Pane}.
@@ -1575,6 +1579,12 @@ module.exports = class Workspace extends Model {
       this.paneContainers.right,
       this.paneContainers.bottom
     ]
+  }
+
+  getVisiblePaneContainers () {
+    const center = this.getCenter()
+    return atom.workspace.getPaneContainers()
+      .filter(container => container === center || container.isVisible())
   }
 
   /*
@@ -1965,7 +1975,7 @@ module.exports = class Workspace extends Model {
     if (editor.getPath()) {
       const checkoutHead = () => {
         return this.project.repositoryForDirectory(new Directory(editor.getDirectoryPath()))
-          .then(repository => repository != null ? repository.checkoutHeadForEditor(editor) : undefined)
+          .then(repository => repository && repository.checkoutHeadForEditor(editor))
       }
 
       if (this.config.get('editor.confirmCheckoutHeadRevision')) {
