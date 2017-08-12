@@ -110,8 +110,8 @@ class TextEditorComponent {
     this.cursorsBlinking = false
     this.cursorsBlinkedOff = false
     this.nextUpdateOnlyBlinksCursors = null
-    this.extraLinesToMeasure = null
-    this.extraRenderedScreenLines = null
+    this.linesToMeasure = new Map()
+    this.extraRenderedScreenLines = new Map()
     this.horizontalPositionsToMeasure = new Map() // Keys are rows with positions we want to measure, values are arrays of columns to measure
     this.horizontalPixelPositionsByScreenLineId = new Map() // Values are maps from column to horiontal pixel positions
     this.blockDecorationsToMeasure = new Set()
@@ -355,6 +355,7 @@ class TextEditorComponent {
     this.queryLineNumbersToRender()
     this.queryGuttersToRender()
     this.queryDecorationsToRender()
+    this.queryExtraScreenLinesToRender()
     this.shouldRenderDummyScrollbars = !this.remeasureScrollbars
     etch.updateSync(this)
     this.updateClassList()
@@ -369,8 +370,6 @@ class TextEditorComponent {
     }
     const wasHorizontalScrollbarVisible = this.isHorizontalScrollbarVisible()
 
-    this.extraRenderedScreenLines = this.extraLinesToMeasure
-    this.extraLinesToMeasure = null
     this.measureLongestLineWidth()
     this.measureHorizontalPositions()
     this.updateAbsolutePositionedDecorations()
@@ -606,21 +605,19 @@ class TextEditorComponent {
       })
     }
 
-    if (this.extraLinesToMeasure) {
-      this.extraLinesToMeasure.forEach((screenLine, screenRow) => {
-        if (screenRow < startRow || screenRow >= endRow) {
-          tileNodes.push($(LineComponent, {
-            key: 'extra-' + screenLine.id,
-            screenLine,
-            screenRow,
-            displayLayer,
-            nodePool: this.lineNodesPool,
-            lineNodesByScreenLineId,
-            textNodesByScreenLineId
-          }))
-        }
-      })
-    }
+    this.extraRenderedScreenLines.forEach((screenLine, screenRow) => {
+      if (screenRow < startRow || screenRow >= endRow) {
+        tileNodes.push($(LineComponent, {
+          key: 'extra-' + screenLine.id,
+          screenLine,
+          screenRow,
+          displayLayer,
+          nodePool: this.lineNodesPool,
+          lineNodesByScreenLineId,
+          textNodesByScreenLineId
+        }))
+      }
+    })
 
     return $.div({
       key: 'lineTiles',
@@ -830,10 +827,20 @@ class TextEditorComponent {
     const longestLineRow = model.getApproximateLongestScreenRow()
     const longestLine = model.screenLineForScreenRow(longestLineRow)
     if (longestLine !== this.previousLongestLine) {
-      this.requestExtraLineToMeasure(longestLineRow, longestLine)
+      this.requestLineToMeasure(longestLineRow, longestLine)
       this.longestLineToMeasure = longestLine
       this.previousLongestLine = longestLine
     }
+  }
+
+  queryExtraScreenLinesToRender () {
+    this.extraRenderedScreenLines.clear()
+    this.linesToMeasure.forEach((screenLine, row) => {
+      if (row < this.getRenderedStartRow() || row >= this.getRenderedEndRow()) {
+        this.extraRenderedScreenLines.set(row, screenLine)
+      }
+    })
+    this.linesToMeasure.clear()
   }
 
   queryLineNumbersToRender () {
@@ -906,7 +913,7 @@ class TextEditorComponent {
   renderedScreenLineForRow (row) {
     return (
       this.renderedScreenLines[row - this.getRenderedStartRow()] ||
-      (this.extraRenderedScreenLines ? this.extraRenderedScreenLines.get(row) : null)
+      this.extraRenderedScreenLines.get(row)
     )
   }
 
@@ -1644,6 +1651,10 @@ class TextEditorComponent {
   //   4. compositionend fired
   //   5. textInput fired; event.data == the completion string
   didCompositionStart () {
+    if (this.getChromeVersion() === 56) {
+      this.getHiddenInput().value = ''
+    }
+
     this.compositionCheckpoint = this.props.model.createCheckpoint()
     if (this.accentedCharacterMenuIsOpen) {
       this.props.model.selectLeft()
@@ -1651,7 +1662,16 @@ class TextEditorComponent {
   }
 
   didCompositionUpdate (event) {
-    this.props.model.insertText(event.data, {select: true})
+    if (this.getChromeVersion() === 56) {
+      process.nextTick(() => {
+        if (this.compositionCheckpoint) {
+          const previewText = this.getHiddenInput().value
+          this.props.model.insertText(previewText, {select: true})
+        }
+      })
+    } else {
+      this.props.model.insertText(event.data, {select: true})
+    }
   }
 
   didCompositionEnd (event) {
@@ -2046,7 +2066,7 @@ class TextEditorComponent {
   }
 
   measureCharacterDimensions () {
-    this.measurements.lineHeight = this.refs.characterMeasurementLine.getBoundingClientRect().height
+    this.measurements.lineHeight = Math.max(1, this.refs.characterMeasurementLine.getBoundingClientRect().height)
     this.measurements.baseCharacterWidth = this.refs.normalWidthCharacterSpan.getBoundingClientRect().width
     this.measurements.doubleWidthCharacterWidth = this.refs.doubleWidthCharacterSpan.getBoundingClientRect().width
     this.measurements.halfWidthCharacterWidth = this.refs.halfWidthCharacterSpan.getBoundingClientRect().width
@@ -2125,29 +2145,24 @@ class TextEditorComponent {
     }
   }
 
-  requestExtraLineToMeasure (row, screenLine) {
-    if (!this.extraLinesToMeasure) this.extraLinesToMeasure = new Map()
-    this.extraLinesToMeasure.set(row, screenLine)
+  requestLineToMeasure (row, screenLine) {
+    this.linesToMeasure.set(row, screenLine)
   }
 
   requestHorizontalMeasurement (row, column) {
     if (column === 0) return
 
-    if (row < this.getRenderedStartRow() || row >= this.getRenderedEndRow()) {
-      const screenLine = this.props.model.screenLineForScreenRow(row)
-      if (screenLine) {
-        this.requestExtraLineToMeasure(row, screenLine)
-      } else {
-        return
-      }
-    }
+    const screenLine = this.props.model.screenLineForScreenRow(row)
+    if (screenLine) {
+      this.requestLineToMeasure(row, screenLine)
 
-    let columns = this.horizontalPositionsToMeasure.get(row)
-    if (columns == null) {
-      columns = []
-      this.horizontalPositionsToMeasure.set(row, columns)
+      let columns = this.horizontalPositionsToMeasure.get(row)
+      if (columns == null) {
+        columns = []
+        this.horizontalPositionsToMeasure.set(row, columns)
+      }
+      columns.push(column)
     }
-    columns.push(column)
   }
 
   measureHorizontalPositions () {
@@ -2260,7 +2275,7 @@ class TextEditorComponent {
 
     let screenLine = this.renderedScreenLineForRow(row)
     if (!screenLine) {
-      this.requestExtraLineToMeasure(row, model.screenLineForScreenRow(row))
+      this.requestLineToMeasure(row, model.screenLineForScreenRow(row))
       this.updateSyncBeforeMeasuringContent()
       this.measureContentDuringUpdateSync()
       screenLine = this.renderedScreenLineForRow(row)
@@ -2808,8 +2823,16 @@ class TextEditorComponent {
     return this.props.inputEnabled != null ? this.props.inputEnabled : true
   }
 
+  getHiddenInput () {
+    return this.refs.cursorsAndInput.refs.hiddenInput
+  }
+
   getPlatform () {
     return this.props.platform || process.platform
+  }
+
+  getChromeVersion () {
+    return this.props.chromeVersion || parseInt(process.versions.chrome)
   }
 }
 
@@ -2851,20 +2874,22 @@ class DummyScrollbarComponent {
       outerStyle.bottom = 0
       outerStyle.left = 0
       outerStyle.right = right + 'px'
-      outerStyle.height = '20px'
+      outerStyle.height = '15px'
       outerStyle.overflowY = 'hidden'
       outerStyle.overflowX = this.props.forceScrollbarVisible ? 'scroll' : 'auto'
-      innerStyle.height = '20px'
+      outerStyle.cursor = 'default'
+      innerStyle.height = '15px'
       innerStyle.width = (this.props.scrollWidth || 0) + 'px'
     } else {
       let bottom = (this.props.horizontalScrollbarHeight || 0)
       outerStyle.right = 0
       outerStyle.top = 0
       outerStyle.bottom = bottom + 'px'
-      outerStyle.width = '20px'
+      outerStyle.width = '15px'
       outerStyle.overflowX = 'hidden'
       outerStyle.overflowY = this.props.forceScrollbarVisible ? 'scroll' : 'auto'
-      innerStyle.width = '20px'
+      outerStyle.cursor = 'default'
+      innerStyle.width = '15px'
       innerStyle.height = (this.props.scrollHeight || 0) + 'px'
     }
 
@@ -3417,8 +3442,10 @@ class CursorsAndInputComponent {
 
 class LinesTileComponent {
   constructor (props) {
+    this.highlightComponentsByKey = new Map()
     this.props = props
     etch.initialize(this)
+    this.updateHighlights()
     this.createLines()
     this.updateBlockDecorations({}, props)
   }
@@ -3432,13 +3459,22 @@ class LinesTileComponent {
         this.updateLines(oldProps, newProps)
         this.updateBlockDecorations(oldProps, newProps)
       }
+      this.updateHighlights()
     }
   }
 
   destroy () {
+    this.highlightComponentsByKey.forEach((highlightComponent) => {
+      highlightComponent.destroy()
+    })
+    this.highlightComponentsByKey.clear()
+
     for (let i = 0; i < this.lineComponents.length; i++) {
       this.lineComponents[i].destroy()
     }
+    this.lineComponents.length = 0
+
+    return etch.destroy(this)
   }
 
   render () {
@@ -3456,34 +3492,12 @@ class LinesTileComponent {
           backgroundColor: 'inherit'
         }
       },
-      this.renderHighlights()
-      // Lines and block decorations will be manually inserted here for efficiency
-    )
-  }
-
-  renderHighlights () {
-    const {top, lineHeight, highlightDecorations} = this.props
-
-    let children = null
-    if (highlightDecorations) {
-      const decorationCount = highlightDecorations.length
-      children = new Array(decorationCount)
-      for (let i = 0; i < decorationCount; i++) {
-        const highlightProps = Object.assign(
-          {parentTileTop: top, lineHeight},
-          highlightDecorations[i]
-        )
-        children[i] = $(HighlightComponent, highlightProps)
-        highlightDecorations[i].flashRequested = false
-      }
-    }
-
-    return $.div(
-      {
+      $.div({
+        ref: 'highlights',
         className: 'highlights',
-        style: {contain: 'layout'}
-      },
-      children
+        style: {layout: 'contain'}
+      })
+      // Lines and block decorations will be manually inserted here for efficiency
     )
   }
 
@@ -3674,6 +3688,40 @@ class LinesTileComponent {
         }
       })
     }
+  }
+
+  updateHighlights () {
+    const {top, lineHeight, highlightDecorations} = this.props
+
+    const visibleHighlightDecorations = new Set()
+    if (highlightDecorations) {
+      for (let i = 0; i < highlightDecorations.length; i++) {
+        const highlightDecoration = highlightDecorations[i]
+
+        const highlightProps = Object.assign(
+          {parentTileTop: top, lineHeight},
+          highlightDecorations[i]
+        )
+        let highlightComponent = this.highlightComponentsByKey.get(highlightDecoration.key)
+        if (highlightComponent) {
+          highlightComponent.update(highlightProps)
+        } else {
+          highlightComponent = new HighlightComponent(highlightProps)
+          this.refs.highlights.appendChild(highlightComponent.element)
+          this.highlightComponentsByKey.set(highlightDecoration.key, highlightComponent)
+        }
+
+        highlightDecorations[i].flashRequested = false
+        visibleHighlightDecorations.add(highlightDecoration.key)
+      }
+    }
+
+    this.highlightComponentsByKey.forEach((highlightComponent, key) => {
+      if (!visibleHighlightDecorations.has(key)) {
+        highlightComponent.destroy()
+        this.highlightComponentsByKey.delete(key)
+      }
+    })
   }
 
   shouldUpdate (newProps) {
@@ -3874,6 +3922,17 @@ class HighlightComponent {
     this.props = props
     etch.initialize(this)
     if (this.props.flashRequested) this.performFlash()
+  }
+
+  destroy () {
+    if (this.timeoutsByClassName) {
+      this.timeoutsByClassName.forEach((timeout) => {
+        window.clearTimeout(timeout)
+      })
+      this.timeoutsByClassName.clear()
+    }
+
+    return etch.destroy(this)
   }
 
   update (newProps) {
