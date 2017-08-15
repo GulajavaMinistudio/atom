@@ -552,6 +552,7 @@ class TextEditorComponent {
       ]
     } else {
       children = [
+        this.renderCursorsAndInput(),
         this.renderBlockDecorationMeasurementArea(),
         this.renderCharacterMeasurementLine()
       ]
@@ -1449,16 +1450,14 @@ class TextEditorComponent {
       this.scheduleUpdate()
     }
 
-    const {hiddenInput} = this.refs.cursorsAndInput.refs
-    hiddenInput.focus()
+    this.getHiddenInput().focus()
   }
 
   // Called by TextEditorElement so that this function is always the first
   // listener to be fired, even if other listeners are bound before creating
   // the component.
   didBlur (event) {
-    const {cursorsAndInput} = this.refs
-    if (cursorsAndInput && event.relatedTarget === cursorsAndInput.refs.hiddenInput) {
+    if (event.relatedTarget === this.getHiddenInput()) {
       event.stopImmediatePropagation()
     }
   }
@@ -1688,6 +1687,18 @@ class TextEditorComponent {
     const {model} = this.props
     const {target, button, detail, ctrlKey, shiftKey, metaKey} = event
     const platform = this.getPlatform()
+
+    // Ignore clicks on block decorations.
+    if (target) {
+      let element = target
+      while (element && element !== this.element) {
+        if (this.blockDecorationsByElement.has(element)) {
+          return
+        }
+
+        element = element.parentElement
+      }
+    }
 
     // On Linux, position the cursor on middle mouse button click. A
     // textInput event with the contents of the selection clipboard will be
