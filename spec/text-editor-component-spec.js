@@ -220,13 +220,13 @@ describe('TextEditorComponent', () => {
     it('keeps the number of tiles stable when the visible line count changes during vertical scrolling', async () => {
       const {component, element, editor} = buildComponent({rowsPerTile: 3, autoHeight: false})
       await setEditorHeightInLines(component, 5.5)
-      expect(component.refs.lineTiles.children.length).toBe(3)
+      expect(component.refs.lineTiles.children.length).toBe(3 + 1) // account for cursors container
 
       await setScrollTop(component, 0.5 * component.getLineHeight())
-      expect(component.refs.lineTiles.children.length).toBe(3)
+      expect(component.refs.lineTiles.children.length).toBe(3 + 1) // account for cursors container
 
       await setScrollTop(component, 1 * component.getLineHeight())
-      expect(component.refs.lineTiles.children.length).toBe(3)
+      expect(component.refs.lineTiles.children.length).toBe(3 + 1) // account for cursors container
     })
 
     it('recycles tiles on resize', async () => {
@@ -479,12 +479,44 @@ describe('TextEditorComponent', () => {
 
       editor.setCursorScreenPosition([0, 3])
       await component.getNextUpdatePromise()
-      const cursor = element.querySelector('.cursor')
       verifyCursorPosition(component, element.querySelector('.cursor'), 0, 3)
 
       editor.setCursorScreenPosition([0, 4])
       await component.getNextUpdatePromise()
       verifyCursorPosition(component, element.querySelector('.cursor'), 0, 4)
+    })
+
+    it('positions cursors and placeholder text correctly when the lines container has a margin and/or is padded', async () => {
+      const {component, element, editor} = buildComponent({placeholderText: 'testing'})
+
+      component.refs.lineTiles.style.marginLeft = '10px'
+      TextEditor.didUpdateStyles()
+      await component.getNextUpdatePromise()
+
+      editor.setCursorBufferPosition([0, 3])
+      await component.getNextUpdatePromise()
+      verifyCursorPosition(component, element.querySelector('.cursor'), 0, 3)
+
+      editor.setCursorScreenPosition([1, 0])
+      await component.getNextUpdatePromise()
+      verifyCursorPosition(component, element.querySelector('.cursor'), 1, 0)
+
+      component.refs.lineTiles.style.paddingTop = '5px'
+      TextEditor.didUpdateStyles()
+      await component.getNextUpdatePromise()
+      verifyCursorPosition(component, element.querySelector('.cursor'), 1, 0)
+
+      editor.setCursorScreenPosition([2, 2])
+      TextEditor.didUpdateStyles()
+      await component.getNextUpdatePromise()
+      verifyCursorPosition(component, element.querySelector('.cursor'), 2, 2)
+
+      editor.setText('')
+      await component.getNextUpdatePromise()
+
+      const placeholderTextLeft = element.querySelector('.placeholder-text').getBoundingClientRect().left
+      const linesLeft = component.refs.lineTiles.getBoundingClientRect().left
+      expect(placeholderTextLeft).toBe(linesLeft)
     })
 
     it('places the hidden input element at the location of the last cursor if it is visible', async () => {
@@ -1108,51 +1140,55 @@ describe('TextEditorComponent', () => {
   })
 
   describe('scrolling via the mouse wheel', () => {
-    it('scrolls vertically when deltaY is not 0', () => {
-      const mouseWheelScrollSensitivity = 0.4
-      const {component, editor} = buildComponent({height: 50, mouseWheelScrollSensitivity})
+    it('scrolls vertically or horizontally depending on whether deltaX or deltaY is larger', () => {
+      const scrollSensitivity = 30
+      const {component, editor} = buildComponent({height: 50, width: 50, scrollSensitivity})
 
       {
-        const expectedScrollTop = 20 * mouseWheelScrollSensitivity
-        component.didMouseWheel({deltaX: 0, deltaY: 20})
+        const expectedScrollTop = 20 * (scrollSensitivity / 100)
+        const expectedScrollLeft = component.getScrollLeft()
+        component.didMouseWheel({deltaX: 5, deltaY: 20})
         expect(component.getScrollTop()).toBe(expectedScrollTop)
-        expect(component.refs.content.style.transform).toBe(`translate(0px, -${expectedScrollTop}px)`)
+        expect(component.getScrollLeft()).toBe(expectedScrollLeft)
+        expect(component.refs.content.style.transform).toBe(`translate(${-expectedScrollLeft}px, ${-expectedScrollTop}px)`)
       }
 
       {
-        const expectedScrollTop = component.getScrollTop() - (10 * mouseWheelScrollSensitivity)
-        component.didMouseWheel({deltaX: 0, deltaY: -10})
+        const expectedScrollTop = component.getScrollTop() - (10 * (scrollSensitivity / 100))
+        const expectedScrollLeft = component.getScrollLeft()
+        component.didMouseWheel({deltaX: 5, deltaY: -10})
         expect(component.getScrollTop()).toBe(expectedScrollTop)
-        expect(component.refs.content.style.transform).toBe(`translate(0px, -${expectedScrollTop}px)`)
-      }
-    })
-
-    it('scrolls horizontally when deltaX is not 0', () => {
-      const mouseWheelScrollSensitivity = 0.4
-      const {component, editor} = buildComponent({width: 50, mouseWheelScrollSensitivity})
-
-      {
-        const expectedScrollLeft = 20 * mouseWheelScrollSensitivity
-        component.didMouseWheel({deltaX: 20, deltaY: 0})
         expect(component.getScrollLeft()).toBe(expectedScrollLeft)
-        expect(component.refs.content.style.transform).toBe(`translate(-${expectedScrollLeft}px, 0px)`)
+        expect(component.refs.content.style.transform).toBe(`translate(${-expectedScrollLeft}px, ${-expectedScrollTop}px)`)
       }
 
       {
-        const expectedScrollLeft = component.getScrollLeft() - (10 * mouseWheelScrollSensitivity)
-        component.didMouseWheel({deltaX: -10, deltaY: 0})
+        global.debug = true
+        const expectedScrollTop = component.getScrollTop()
+        const expectedScrollLeft = 20 * (scrollSensitivity / 100)
+        component.didMouseWheel({deltaX: 20, deltaY: -10})
+        expect(component.getScrollTop()).toBe(expectedScrollTop)
         expect(component.getScrollLeft()).toBe(expectedScrollLeft)
-        expect(component.refs.content.style.transform).toBe(`translate(-${expectedScrollLeft}px, 0px)`)
+        expect(component.refs.content.style.transform).toBe(`translate(${-expectedScrollLeft}px, ${-expectedScrollTop}px)`)
+      }
+
+      {
+        const expectedScrollTop = component.getScrollTop()
+        const expectedScrollLeft = component.getScrollLeft() - (10 * (scrollSensitivity / 100))
+        component.didMouseWheel({deltaX: -10, deltaY: 8})
+        expect(component.getScrollTop()).toBe(expectedScrollTop)
+        expect(component.getScrollLeft()).toBe(expectedScrollLeft)
+        expect(component.refs.content.style.transform).toBe(`translate(${-expectedScrollLeft}px, ${-expectedScrollTop}px)`)
       }
     })
 
     it('inverts deltaX and deltaY when holding shift on Windows and Linux', async () => {
-      const mouseWheelScrollSensitivity = 0.4
-      const {component, editor} = buildComponent({height: 50, width: 50, mouseWheelScrollSensitivity})
+      const scrollSensitivity = 50
+      const {component, editor} = buildComponent({height: 50, width: 50, scrollSensitivity})
 
       component.props.platform = 'linux'
       {
-        const expectedScrollTop = 20 * mouseWheelScrollSensitivity
+        const expectedScrollTop = 20 * (scrollSensitivity / 100)
         component.didMouseWheel({deltaX: 0, deltaY: 20})
         expect(component.getScrollTop()).toBe(expectedScrollTop)
         expect(component.refs.content.style.transform).toBe(`translate(0px, -${expectedScrollTop}px)`)
@@ -1160,7 +1196,7 @@ describe('TextEditorComponent', () => {
       }
 
       {
-        const expectedScrollLeft = 20 * mouseWheelScrollSensitivity
+        const expectedScrollLeft = 20 * (scrollSensitivity / 100)
         component.didMouseWheel({deltaX: 0, deltaY: 20, shiftKey: true})
         expect(component.getScrollLeft()).toBe(expectedScrollLeft)
         expect(component.refs.content.style.transform).toBe(`translate(-${expectedScrollLeft}px, 0px)`)
@@ -1168,7 +1204,7 @@ describe('TextEditorComponent', () => {
       }
 
       {
-        const expectedScrollTop = 20 * mouseWheelScrollSensitivity
+        const expectedScrollTop = 20 * (scrollSensitivity / 100)
         component.didMouseWheel({deltaX: 20, deltaY: 0, shiftKey: true})
         expect(component.getScrollTop()).toBe(expectedScrollTop)
         expect(component.refs.content.style.transform).toBe(`translate(0px, -${expectedScrollTop}px)`)
@@ -1177,7 +1213,7 @@ describe('TextEditorComponent', () => {
 
       component.props.platform = 'win32'
       {
-        const expectedScrollTop = 20 * mouseWheelScrollSensitivity
+        const expectedScrollTop = 20 * (scrollSensitivity / 100)
         component.didMouseWheel({deltaX: 0, deltaY: 20})
         expect(component.getScrollTop()).toBe(expectedScrollTop)
         expect(component.refs.content.style.transform).toBe(`translate(0px, -${expectedScrollTop}px)`)
@@ -1185,7 +1221,7 @@ describe('TextEditorComponent', () => {
       }
 
       {
-        const expectedScrollLeft = 20 * mouseWheelScrollSensitivity
+        const expectedScrollLeft = 20 * (scrollSensitivity / 100)
         component.didMouseWheel({deltaX: 0, deltaY: 20, shiftKey: true})
         expect(component.getScrollLeft()).toBe(expectedScrollLeft)
         expect(component.refs.content.style.transform).toBe(`translate(-${expectedScrollLeft}px, 0px)`)
@@ -1193,7 +1229,7 @@ describe('TextEditorComponent', () => {
       }
 
       {
-        const expectedScrollTop = 20 * mouseWheelScrollSensitivity
+        const expectedScrollTop = 20 * (scrollSensitivity / 100)
         component.didMouseWheel({deltaX: 20, deltaY: 0, shiftKey: true})
         expect(component.getScrollTop()).toBe(expectedScrollTop)
         expect(component.refs.content.style.transform).toBe(`translate(0px, -${expectedScrollTop}px)`)
@@ -1202,7 +1238,7 @@ describe('TextEditorComponent', () => {
 
       component.props.platform = 'darwin'
       {
-        const expectedScrollTop = 20 * mouseWheelScrollSensitivity
+        const expectedScrollTop = 20 * (scrollSensitivity / 100)
         component.didMouseWheel({deltaX: 0, deltaY: 20})
         expect(component.getScrollTop()).toBe(expectedScrollTop)
         expect(component.refs.content.style.transform).toBe(`translate(0px, -${expectedScrollTop}px)`)
@@ -1210,7 +1246,7 @@ describe('TextEditorComponent', () => {
       }
 
       {
-        const expectedScrollTop = 20 * mouseWheelScrollSensitivity
+        const expectedScrollTop = 20 * (scrollSensitivity / 100)
         component.didMouseWheel({deltaX: 0, deltaY: 20, shiftKey: true})
         expect(component.getScrollTop()).toBe(expectedScrollTop)
         expect(component.refs.content.style.transform).toBe(`translate(0px, -${expectedScrollTop}px)`)
@@ -1218,7 +1254,7 @@ describe('TextEditorComponent', () => {
       }
 
       {
-        const expectedScrollLeft = 20 * mouseWheelScrollSensitivity
+        const expectedScrollLeft = 20 * (scrollSensitivity / 100)
         component.didMouseWheel({deltaX: 20, deltaY: 0, shiftKey: true})
         expect(component.getScrollLeft()).toBe(expectedScrollLeft)
         expect(component.refs.content.style.transform).toBe(`translate(-${expectedScrollLeft}px, 0px)`)
@@ -3610,6 +3646,23 @@ describe('TextEditorComponent', () => {
       element.style.display = 'none'
       await component.getNextUpdatePromise()
     })
+
+    it('does not throw an exception when the editor is soft-wrapped and changing the font size changes also the longest screen line', async () => {
+      const {component, element, editor} = buildComponent({rowsPerTile: 3, autoHeight: false})
+      editor.setText(
+        'Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do\n' +
+        'eiusmod tempor incididunt ut labore et dolore magna' +
+        'aliqua. Ut enim ad minim veniam, quis nostrud exercitation'
+      )
+      editor.setSoftWrapped(true)
+      await setEditorHeightInLines(component, 2)
+      await setEditorWidthInCharacters(component, 56)
+      await setScrollTop(component, 3 * component.getLineHeight())
+
+      element.style.fontSize = '20px'
+      TextEditor.didUpdateStyles()
+      await component.getNextUpdatePromise()
+    })
   })
 
   describe('synchronous updates', () => {
@@ -3846,7 +3899,7 @@ function buildEditor (params = {}) {
   const buffer = new TextBuffer({text})
   const editorParams = {buffer}
   if (params.height != null) params.autoHeight = false
-  for (const paramName of ['mini', 'autoHeight', 'autoWidth', 'lineNumberGutterVisible', 'showLineNumbers', 'placeholderText', 'softWrapped']) {
+  for (const paramName of ['mini', 'autoHeight', 'autoWidth', 'lineNumberGutterVisible', 'showLineNumbers', 'placeholderText', 'softWrapped', 'scrollSensitivity']) {
     if (params[paramName] != null) editorParams[paramName] = params[paramName]
   }
   return new TextEditor(editorParams)
@@ -3859,8 +3912,7 @@ function buildComponent (params = {}) {
     rowsPerTile: params.rowsPerTile,
     updatedSynchronously: params.updatedSynchronously || false,
     platform: params.platform,
-    chromeVersion: params.chromeVersion,
-    mouseWheelScrollSensitivity: params.mouseWheelScrollSensitivity
+    chromeVersion: params.chromeVersion
   })
   const {element} = component
   if (!editor.getAutoHeight()) {
