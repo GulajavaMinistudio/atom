@@ -32,6 +32,10 @@ class TextEditorComponent {
     etch.setScheduler(scheduler)
   }
 
+  static getScheduler () {
+    return etch.getScheduler()
+  }
+
   static didUpdateStyles () {
     if (this.attachedComponents) {
       this.attachedComponents.forEach((component) => {
@@ -244,6 +248,7 @@ class TextEditorComponent {
 
       this.measureCharacterDimensions()
       this.measureGutterDimensions()
+      this.queryLongestLine()
 
       if (this.getLineHeight() !== originalLineHeight) {
         this.setScrollTopRow(scrollTopRow)
@@ -357,6 +362,7 @@ class TextEditorComponent {
     this.populateVisibleRowRange()
     this.populateVisibleTiles()
     this.queryScreenLinesToRender()
+    this.queryLongestLine()
     this.queryLineNumbersToRender()
     this.queryGuttersToRender()
     this.queryDecorationsToRender()
@@ -389,6 +395,7 @@ class TextEditorComponent {
       this.pendingAutoscroll = null
     }
 
+    this.linesToMeasure.clear()
     this.measuredContent = true
   }
 
@@ -618,6 +625,7 @@ class TextEditorComponent {
         if (screenRow < startRow || screenRow >= endRow) {
           children.push($(LineComponent, {
             key: 'extra-' + screenLine.id,
+            offScreen: true,
             screenLine,
             screenRow,
             displayLayer: this.props.model.displayLayer,
@@ -831,10 +839,14 @@ class TextEditorComponent {
       this.getRenderedStartRow(),
       this.getRenderedEndRow()
     )
+  }
+
+  queryLongestLine () {
+    const {model} = this.props
 
     const longestLineRow = model.getApproximateLongestScreenRow()
     const longestLine = model.screenLineForScreenRow(longestLineRow)
-    if (longestLine !== this.previousLongestLine) {
+    if (longestLine !== this.previousLongestLine || this.remeasureCharacterDimensions) {
       this.requestLineToMeasure(longestLineRow, longestLine)
       this.longestLineToMeasure = longestLine
       this.previousLongestLine = longestLine
@@ -848,7 +860,6 @@ class TextEditorComponent {
         this.extraRenderedScreenLines.set(row, screenLine)
       }
     })
-    this.linesToMeasure.clear()
   }
 
   queryLineNumbersToRender () {
@@ -1660,17 +1671,6 @@ class TextEditorComponent {
   //   4. compositionend fired
   //   5. textInput fired; event.data == the completion string
   didCompositionStart () {
-    if (this.getChromeVersion() === 56) {
-      this.getHiddenInput().value = ''
-    }
-
-    this.compositionCheckpoint = this.props.model.createCheckpoint()
-    if (this.accentedCharacterMenuIsOpen) {
-      this.props.model.selectLeft()
-    }
-  }
-
-  didCompositionUpdate (event) {
     // Workaround for Chromium not preventing composition events when
     // preventDefault is called on the keydown event that precipitated them.
     if (this.lastKeydown && this.lastKeydown.defaultPrevented) {
@@ -1684,6 +1684,17 @@ class TextEditorComponent {
       return
     }
 
+    if (this.getChromeVersion() === 56) {
+      this.getHiddenInput().value = ''
+    }
+
+    this.compositionCheckpoint = this.props.model.createCheckpoint()
+    if (this.accentedCharacterMenuIsOpen) {
+      this.props.model.selectLeft()
+    }
+  }
+
+  didCompositionUpdate (event) {
     if (this.getChromeVersion() === 56) {
       process.nextTick(() => {
         if (this.compositionCheckpoint != null) {
@@ -1876,7 +1887,7 @@ class TextEditorComponent {
     }
 
     window.addEventListener('mousemove', didMouseMove)
-    window.addEventListener('mouseup', didMouseUp)
+    window.addEventListener('mouseup', didMouseUp, {capture: true})
   }
 
   autoscrollOnMouseDrag ({clientX, clientY}, verticalOnly = false) {
@@ -2717,7 +2728,7 @@ class TextEditorComponent {
   }
 
   getMaxScrollTop () {
-    return Math.max(0, this.getScrollHeight() - this.getScrollContainerClientHeight())
+    return Math.round(Math.max(0, this.getScrollHeight() - this.getScrollContainerClientHeight()))
   }
 
   getScrollBottom () {
@@ -2745,7 +2756,7 @@ class TextEditorComponent {
   }
 
   getMaxScrollLeft () {
-    return Math.max(0, this.getScrollWidth() - this.getScrollContainerClientWidth())
+    return Math.round(Math.max(0, this.getScrollWidth() - this.getScrollContainerClientWidth()))
   }
 
   getScrollRight () {
@@ -3825,11 +3836,18 @@ class LinesTileComponent {
 
 class LineComponent {
   constructor (props) {
-    const {nodePool, screenRow, screenLine, lineNodesByScreenLineId} = props
+    const {nodePool, screenRow, screenLine, lineNodesByScreenLineId, offScreen} = props
     this.props = props
     this.element = nodePool.getElement('DIV', this.buildClassName(), null)
     this.element.dataset.screenRow = screenRow
     lineNodesByScreenLineId.set(screenLine.id, this.element)
+
+    if (offScreen) {
+      this.element.style.position = 'absolute'
+      this.element.style.visibility = 'hidden'
+      this.element.dataset.offScreen = true
+    }
+
     this.appendContents()
   }
 
@@ -4222,7 +4240,7 @@ class NodePool {
         if (!style || style[key] == null) element.style[key] = ''
       })
       if (style) Object.assign(element.style, style)
-
+      for (const key in element.dataset) delete element.dataset[key]
       while (element.firstChild) element.firstChild.remove()
       return element
     } else {
