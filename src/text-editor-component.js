@@ -551,10 +551,10 @@ class TextEditorComponent {
       backgroundColor: 'inherit'
     }
     if (this.hasInitialMeasurements) {
-      style.width = this.getScrollWidth() + 'px'
-      style.height = this.getScrollHeight() + 'px'
+      style.width = ceilToPhysicalPixelBoundary(this.getScrollWidth()) + 'px'
+      style.height = ceilToPhysicalPixelBoundary(this.getScrollHeight()) + 'px'
       style.willChange = 'transform'
-      style.transform = `translate(${-this.getScrollLeft()}px, ${-this.getScrollTop()}px)`
+      style.transform = `translate(${-roundToPhysicalPixelBoundary(this.getScrollLeft())}px, ${-roundToPhysicalPixelBoundary(this.getScrollTop())}px)`
       children = [
         this.renderLineTiles(),
         this.renderBlockDecorationMeasurementArea(),
@@ -740,19 +740,21 @@ class TextEditorComponent {
           ref: 'verticalScrollbar',
           orientation: 'vertical',
           didScroll: this.didScrollDummyScrollbar,
-          didMousedown: this.didMouseDownOnContent,
+          didMouseDown: this.didMouseDownOnContent,
           scrollHeight,
           scrollTop,
           horizontalScrollbarHeight,
+          verticalScrollbarWidth,
           forceScrollbarVisible
         }),
         $(DummyScrollbarComponent, {
           ref: 'horizontalScrollbar',
           orientation: 'horizontal',
           didScroll: this.didScrollDummyScrollbar,
-          didMousedown: this.didMouseDownOnContent,
+          didMouseDown: this.didMouseDownOnContent,
           scrollWidth,
           scrollLeft,
+          horizontalScrollbarHeight,
           verticalScrollbarWidth,
           forceScrollbarVisible
         })
@@ -2715,6 +2717,8 @@ class TextEditorComponent {
   }
 
   setScrollTop (scrollTop) {
+    if (Number.isNaN(scrollTop) || scrollTop == null) return false
+
     scrollTop = Math.round(Math.max(0, Math.min(this.getMaxScrollTop(), scrollTop)))
     if (scrollTop !== this.scrollTop) {
       this.derivedDimensionsCache = {}
@@ -2744,6 +2748,8 @@ class TextEditorComponent {
   }
 
   setScrollLeft (scrollLeft) {
+    if (Number.isNaN(scrollLeft) || scrollLeft == null) return false
+
     scrollLeft = Math.round(Math.max(0, Math.min(this.getMaxScrollLeft(), scrollLeft)))
     if (scrollLeft !== this.scrollLeft) {
       this.scrollLeftPending = true
@@ -2908,55 +2914,67 @@ class DummyScrollbarComponent {
   }
 
   render () {
+    const {
+      orientation, scrollWidth, scrollHeight,
+      verticalScrollbarWidth, horizontalScrollbarHeight, forceScrollbarVisible,
+      didScroll, didMouseDown
+    } = this.props
+
     const outerStyle = {
       position: 'absolute',
       contain: 'strict',
       zIndex: 1
     }
     const innerStyle = {}
-    if (this.props.orientation === 'horizontal') {
-      let right = (this.props.verticalScrollbarWidth || 0)
+    if (orientation === 'horizontal') {
+      let right = (verticalScrollbarWidth || 0)
       outerStyle.bottom = 0
       outerStyle.left = 0
       outerStyle.right = right + 'px'
       outerStyle.height = '15px'
       outerStyle.overflowY = 'hidden'
-      outerStyle.overflowX = this.props.forceScrollbarVisible ? 'scroll' : 'auto'
+      outerStyle.overflowX = forceScrollbarVisible ? 'scroll' : 'auto'
       outerStyle.cursor = 'default'
+      if (horizontalScrollbarHeight === 0) {
+        outerStyle.visibility = 'hidden'
+      }
       innerStyle.height = '15px'
-      innerStyle.width = (this.props.scrollWidth || 0) + 'px'
+      innerStyle.width = (scrollWidth || 0) + 'px'
     } else {
-      let bottom = (this.props.horizontalScrollbarHeight || 0)
+      let bottom = (horizontalScrollbarHeight || 0)
       outerStyle.right = 0
       outerStyle.top = 0
       outerStyle.bottom = bottom + 'px'
       outerStyle.width = '15px'
       outerStyle.overflowX = 'hidden'
-      outerStyle.overflowY = this.props.forceScrollbarVisible ? 'scroll' : 'auto'
+      outerStyle.overflowY = forceScrollbarVisible ? 'scroll' : 'auto'
       outerStyle.cursor = 'default'
+      if (verticalScrollbarWidth === 0) {
+        outerStyle.visibility = 'hidden'
+      }
       innerStyle.width = '15px'
-      innerStyle.height = (this.props.scrollHeight || 0) + 'px'
+      innerStyle.height = (scrollHeight || 0) + 'px'
     }
 
     return $.div(
       {
-        className: `${this.props.orientation}-scrollbar`,
+        className: `${orientation}-scrollbar`,
         style: outerStyle,
         on: {
-          scroll: this.props.didScroll,
-          mousedown: this.didMousedown
+          scroll: didScroll,
+          mousedown: didMouseDown
         }
       },
       $.div({style: innerStyle})
     )
   }
 
-  didMousedown (event) {
+  didMouseDown (event) {
     let {bottom, right} = this.element.getBoundingClientRect()
     const clickedOnScrollbar = (this.props.orientation === 'horizontal')
       ? event.clientY >= (bottom - this.getRealScrollbarHeight())
       : event.clientX >= (right - this.getRealScrollbarWidth())
-    if (!clickedOnScrollbar) this.props.didMousedown(event)
+    if (!clickedOnScrollbar) this.props.didMouseDown(event)
   }
 
   getRealScrollbarWidth () {
@@ -2997,7 +3015,7 @@ class GutterContainerComponent {
     }
 
     if (hasInitialMeasurements) {
-      innerStyle.transform = `translateY(${-scrollTop}px)`
+      innerStyle.transform = `translateY(${-roundToPhysicalPixelBoundary(scrollTop)}px)`
     }
 
     return $.div(
@@ -3153,10 +3171,10 @@ class LineNumberGutterComponent {
             overflow: 'hidden',
             position: 'absolute',
             top: 0,
-            height: tileHeight + 'px',
-            width: width + 'px',
+            height: ceilToPhysicalPixelBoundary(tileHeight) + 'px',
+            width: ceilToPhysicalPixelBoundary(width) + 'px',
             willChange: 'transform',
-            transform: `translateY(${tileTop}px)`,
+            transform: `translateY(${roundToPhysicalPixelBoundary(tileTop)}px)`,
             backgroundColor: 'inherit'
           }
         }, ...tileChildren)
@@ -3167,7 +3185,7 @@ class LineNumberGutterComponent {
       {
         className: 'gutter line-numbers',
         attributes: {'gutter-name': 'line-number'},
-        style: {position: 'relative', height: height + 'px'},
+        style: {position: 'relative', height: ceilToPhysicalPixelBoundary(height) + 'px'},
         on: {
           mousedown: this.didMouseDown
         }
@@ -3530,10 +3548,10 @@ class LinesTileComponent {
         style: {
           contain: 'strict',
           position: 'absolute',
-          height: height + 'px',
-          width: width + 'px',
+          height: ceilToPhysicalPixelBoundary(height) + 'px',
+          width: ceilToPhysicalPixelBoundary(width) + 'px',
           willChange: 'transform',
-          transform: `translateY(${top}px)`,
+          transform: `translateY(${roundToPhysicalPixelBoundary(top)}px)`,
           backgroundColor: 'inherit'
         }
       },
@@ -4284,4 +4302,14 @@ class NodePool {
       }
     }
   }
+}
+
+function roundToPhysicalPixelBoundary (virtualPixelPosition) {
+  const virtualPixelsPerPhysicalPixel = (1 / window.devicePixelRatio)
+  return Math.round(virtualPixelPosition / virtualPixelsPerPhysicalPixel) * virtualPixelsPerPhysicalPixel
+}
+
+function ceilToPhysicalPixelBoundary (virtualPixelPosition) {
+  const virtualPixelsPerPhysicalPixel = (1 / window.devicePixelRatio)
+  return Math.ceil(virtualPixelPosition / virtualPixelsPerPhysicalPixel) * virtualPixelsPerPhysicalPixel
 }
