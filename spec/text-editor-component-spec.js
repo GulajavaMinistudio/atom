@@ -2388,6 +2388,31 @@ describe('TextEditorComponent', () => {
       ])
     })
 
+    it('does not attempt to render block decorations located outside the visible range', async () => {
+      const {editor, component} = buildComponent({autoHeight: false, rowsPerTile: 2})
+      await setEditorHeightInLines(component, 2)
+      expect(component.getRenderedStartRow()).toBe(0)
+      expect(component.getRenderedEndRow()).toBe(4)
+
+      const marker1 = editor.markScreenRange([[3, 0], [5, 0]], {reversed: false})
+      const item1 = document.createElement('div')
+      editor.decorateMarker(marker1, {type: 'block', item: item1})
+
+      const marker2 = editor.markScreenRange([[3, 0], [5, 0]], {reversed: true})
+      const item2 = document.createElement('div')
+      editor.decorateMarker(marker2, {type: 'block', item: item2})
+
+      await component.getNextUpdatePromise()
+      expect(item1.parentElement).toBeNull()
+      expect(item2.nextSibling).toBe(lineNodeForScreenRow(component, 3))
+
+      await setScrollTop(component, 4 * component.getLineHeight())
+      expect(component.getRenderedStartRow()).toBe(4)
+      expect(component.getRenderedEndRow()).toBe(8)
+      expect(item1.nextSibling).toBe(lineNodeForScreenRow(component, 5))
+      expect(item2.parentElement).toBeNull()
+    })
+
     it('measures block decorations correctly when they are added before the component width has been updated', async () => {
       {
         const {editor, component, element} = buildComponent({autoHeight: false, width: 500, attach: false})
@@ -2706,6 +2731,8 @@ describe('TextEditorComponent', () => {
           clientY: clientTopForLine(component, 3) + lineHeight / 2
         })
         expect(editor.getCursorScreenPosition()).toEqual([3, 16])
+
+        expect(editor.testAutoscrollRequests).toEqual([])
       })
 
       it('selects words on double-click', () => {
@@ -2714,6 +2741,7 @@ describe('TextEditorComponent', () => {
         component.didMouseDownOnContent({detail: 1, button: 0, clientX, clientY})
         component.didMouseDownOnContent({detail: 2, button: 0, clientX, clientY})
         expect(editor.getSelectedScreenRange()).toEqual([[1, 13], [1, 21]])
+        expect(editor.testAutoscrollRequests).toEqual([])
       })
 
       it('selects lines on triple-click', () => {
@@ -2723,6 +2751,7 @@ describe('TextEditorComponent', () => {
         component.didMouseDownOnContent({detail: 2, button: 0, clientX, clientY})
         component.didMouseDownOnContent({detail: 3, button: 0, clientX, clientY})
         expect(editor.getSelectedScreenRange()).toEqual([[1, 0], [2, 0]])
+        expect(editor.testAutoscrollRequests).toEqual([])
       })
 
       it('adds or removes cursors when holding cmd or ctrl when single-clicking', () => {
@@ -2760,7 +2789,7 @@ describe('TextEditorComponent', () => {
         expect(editor.getCursorScreenPositions()).toEqual([[1, 16]])
 
         // cmd-clicking within a selection destroys it
-        editor.addSelectionForScreenRange([[2, 10], [2, 15]])
+        editor.addSelectionForScreenRange([[2, 10], [2, 15]], {autoscroll: false})
         expect(editor.getSelectedScreenRanges()).toEqual([
           [[1, 16], [1, 16]],
           [[2, 10], [2, 15]]
@@ -2790,7 +2819,7 @@ describe('TextEditorComponent', () => {
 
         // ctrl-click adds cursors on platforms *other* than macOS
         component.props.platform = 'win32'
-        editor.setCursorScreenPosition([1, 4])
+        editor.setCursorScreenPosition([1, 4], {autoscroll: false})
         component.didMouseDownOnContent(
           Object.assign(clientPositionForCharacter(component, 1, 16), {
             detail: 1,
@@ -2799,11 +2828,13 @@ describe('TextEditorComponent', () => {
           })
         )
         expect(editor.getCursorScreenPositions()).toEqual([[1, 4], [1, 16]])
+
+        expect(editor.testAutoscrollRequests).toEqual([])
       })
 
       it('adds word selections when holding cmd or ctrl when double-clicking', () => {
         const {component, editor} = buildComponent()
-        editor.addCursorAtScreenPosition([1, 16])
+        editor.addCursorAtScreenPosition([1, 16], {autoscroll: false})
         expect(editor.getCursorScreenPositions()).toEqual([[0, 0], [1, 16]])
 
         component.didMouseDownOnContent(
@@ -2824,11 +2855,12 @@ describe('TextEditorComponent', () => {
           [[0, 0], [0, 0]],
           [[1, 13], [1, 21]]
         ])
+        expect(editor.testAutoscrollRequests).toEqual([])
       })
 
       it('adds line selections when holding cmd or ctrl when triple-clicking', () => {
         const {component, editor} = buildComponent()
-        editor.addCursorAtScreenPosition([1, 16])
+        editor.addCursorAtScreenPosition([1, 16], {autoscroll: false})
         expect(editor.getCursorScreenPositions()).toEqual([[0, 0], [1, 16]])
 
         const {clientX, clientY} = clientPositionForCharacter(component, 1, 16)
@@ -2840,12 +2872,13 @@ describe('TextEditorComponent', () => {
           [[0, 0], [0, 0]],
           [[1, 0], [2, 0]]
         ])
+        expect(editor.testAutoscrollRequests).toEqual([])
       })
 
       it('expands the last selection on shift-click', () => {
         const {component, element, editor} = buildComponent()
 
-        editor.setCursorScreenPosition([2, 18])
+        editor.setCursorScreenPosition([2, 18], {autoscroll: false})
         component.didMouseDownOnContent(Object.assign({
           detail: 1,
           button: 0,
@@ -2862,8 +2895,8 @@ describe('TextEditorComponent', () => {
 
         // reorients word-wise selections to keep the word selected regardless of
         // where the subsequent shift-click occurs
-        editor.setCursorScreenPosition([2, 18])
-        editor.getLastSelection().selectWord()
+        editor.setCursorScreenPosition([2, 18], {autoscroll: false})
+        editor.getLastSelection().selectWord({autoscroll: false})
         component.didMouseDownOnContent(Object.assign({
           detail: 1,
           button: 0,
@@ -2880,8 +2913,8 @@ describe('TextEditorComponent', () => {
 
         // reorients line-wise selections to keep the word selected regardless of
         // where the subsequent shift-click occurs
-        editor.setCursorScreenPosition([2, 18])
-        editor.getLastSelection().selectLine()
+        editor.setCursorScreenPosition([2, 18], {autoscroll: false})
+        editor.getLastSelection().selectLine(null, {autoscroll: false})
         component.didMouseDownOnContent(Object.assign({
           detail: 1,
           button: 0,
@@ -2895,6 +2928,8 @@ describe('TextEditorComponent', () => {
           shiftKey: true
         }, clientPositionForCharacter(component, 3, 11)))
         expect(editor.getSelectedScreenRange()).toEqual([[2, 0], [4, 0]])
+
+        expect(editor.testAutoscrollRequests).toEqual([])
       })
 
       it('expands the last selection on drag', () => {
@@ -4250,7 +4285,10 @@ function buildEditor (params = {}) {
   for (const paramName of ['mini', 'autoHeight', 'autoWidth', 'lineNumberGutterVisible', 'showLineNumbers', 'placeholderText', 'softWrapped', 'scrollSensitivity']) {
     if (params[paramName] != null) editorParams[paramName] = params[paramName]
   }
-  return new TextEditor(editorParams)
+  const editor = new TextEditor(editorParams)
+  editor.testAutoscrollRequests = []
+  editor.onDidRequestAutoscroll((request) => { editor.testAutoscrollRequests.push(request) })
+  return editor
 }
 
 function buildComponent (params = {}) {

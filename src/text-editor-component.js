@@ -1153,9 +1153,11 @@ class TextEditorComponent {
   }
 
   addBlockDecorationToRender (decoration, screenRange, reversed) {
-    const screenPosition = reversed ? screenRange.start : screenRange.end
-    const tileStartRow = this.tileStartRowForRow(screenPosition.row)
-    const screenLine = this.renderedScreenLines[screenPosition.row - this.getRenderedStartRow()]
+    const {row} = reversed ? screenRange.start : screenRange.end
+    if (row < this.getRenderedStartRow() || row >= this.getRenderedEndRow()) return
+
+    const tileStartRow = this.tileStartRowForRow(row)
+    const screenLine = this.renderedScreenLines[row - this.getRenderedStartRow()]
 
     let decorationsByScreenLine = this.decorationsToRender.blocks.get(tileStartRow)
     if (!decorationsByScreenLine) {
@@ -1761,22 +1763,22 @@ class TextEditorComponent {
           if (existingSelection) {
             if (model.hasMultipleCursors()) existingSelection.destroy()
           } else {
-            model.addCursorAtScreenPosition(screenPosition)
+            model.addCursorAtScreenPosition(screenPosition, {autoscroll: false})
           }
         } else {
           if (shiftKey) {
-            model.selectToScreenPosition(screenPosition)
+            model.selectToScreenPosition(screenPosition, {autoscroll: false})
           } else {
-            model.setCursorScreenPosition(screenPosition)
+            model.setCursorScreenPosition(screenPosition, {autoscroll: false})
           }
         }
         break
       case 2:
-        if (addOrRemoveSelection) model.addCursorAtScreenPosition(screenPosition)
+        if (addOrRemoveSelection) model.addCursorAtScreenPosition(screenPosition, {autoscroll: false})
         model.getLastSelection().selectWord({autoscroll: false})
         break
       case 3:
-        if (addOrRemoveSelection) model.addCursorAtScreenPosition(screenPosition)
+        if (addOrRemoveSelection) model.addCursorAtScreenPosition(screenPosition, {autoscroll: false})
         model.getLastSelection().selectLine(null, {autoscroll: false})
         break
     }
