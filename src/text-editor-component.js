@@ -1403,6 +1403,9 @@ class TextEditorComponent {
 
       if (this.isVisible()) {
         this.didShow()
+
+        if (this.refs.verticalScrollbar) this.refs.verticalScrollbar.flushScrollPosition()
+        if (this.refs.horizontalScrollbar) this.refs.horizontalScrollbar.flushScrollPosition()
       } else {
         this.didHide()
       }
@@ -2503,7 +2506,7 @@ class TextEditorComponent {
         didUpdateDisposable.dispose()
         didDestroyDisposable.dispose()
 
-        if (marker.isValid()) {
+        if (wasValid) {
           this.blockDecorationsToMeasure.delete(decoration)
           this.heightsByBlockDecoration.delete(decoration)
           this.blockDecorationsByElement.delete(element)
@@ -4309,7 +4312,7 @@ class NodePool {
     }
 
     if (element) {
-      element.className = className
+      element.className = className || ''
       element.styleMap.forEach((value, key) => {
         if (!style || style[key] == null) element.style[key] = ''
       })
