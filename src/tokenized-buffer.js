@@ -199,17 +199,20 @@ class TokenizedBuffer {
         })
       }
     } else {
-      let allBlank = true
-      let allBlankOrCommented = true
-
+      let hasCommentedLines = false
+      let hasUncommentedLines = false
       for (let row = start; row <= end; row++) {
         const line = this.buffer.lineForRow(row)
-        const blank = line.match(/^\s*$/)
-        if (!blank) allBlank = false
-        if (!blank && !commentStartRegex.testSync(line)) allBlankOrCommented = false
+        if (NON_WHITESPACE_REGEX.test(line)) {
+          if (commentStartRegex.testSync(line)) {
+            hasCommentedLines = true
+          } else {
+            hasUncommentedLines = true
+          }
+        }
       }
 
-      const shouldUncomment = allBlankOrCommented && !allBlank
+      const shouldUncomment = hasCommentedLines && !hasUncommentedLines
 
       if (shouldUncomment) {
         for (let row = start; row <= end; row++) {
@@ -221,15 +224,22 @@ class TokenizedBuffer {
           }
         }
       } else {
-        let minIndentLevel = null
+        let minIndentLevel = Infinity
+        let minBlankIndentLevel = Infinity
         for (let row = start; row <= end; row++) {
           const line = this.buffer.lineForRow(row)
+          const indentLevel = this.indentLevelForLine(line)
           if (NON_WHITESPACE_REGEX.test(line)) {
-            const indentLevel = this.indentLevelForLine(line)
-            if (minIndentLevel == null || indentLevel < minIndentLevel) minIndentLevel = indentLevel
+            if (indentLevel < minIndentLevel) minIndentLevel = indentLevel
+          } else {
+            if (indentLevel < minBlankIndentLevel) minBlankIndentLevel = indentLevel
           }
         }
-        if (minIndentLevel == null) minIndentLevel = 0
+        minIndentLevel = Number.isFinite(minIndentLevel)
+          ? minIndentLevel
+          : Number.isFinite(minBlankIndentLevel)
+              ? minBlankIndentLevel
+              : 0
 
         const tabLength = this.getTabLength()
         const indentString = ' '.repeat(tabLength * minIndentLevel)
@@ -461,7 +471,7 @@ class TokenizedBuffer {
   }
 
   isFoldableAtRow (row) {
-    return this.endRowForFoldAtRow(row, 1) != null
+    return this.endRowForFoldAtRow(row, 1, true) != null
   }
 
   buildTokenizedLinesForRows (startRow, endRow, startingStack, startingopenScopes) {
@@ -763,27 +773,28 @@ class TokenizedBuffer {
     return result
   }
 
-  endRowForFoldAtRow (row, tabLength) {
+  endRowForFoldAtRow (row, tabLength, existenceOnly = false) {
     if (this.isRowCommented(row)) {
-      return this.endRowForCommentFoldAtRow(row)
+      return this.endRowForCommentFoldAtRow(row, existenceOnly)
     } else {
-      return this.endRowForCodeFoldAtRow(row, tabLength)
+      return this.endRowForCodeFoldAtRow(row, tabLength, existenceOnly)
     }
   }
 
-  endRowForCommentFoldAtRow (row) {
+  endRowForCommentFoldAtRow (row, existenceOnly) {
     if (this.isRowCommented(row - 1)) return
 
     let endRow
     for (let nextRow = row + 1, end = this.buffer.getLineCount(); nextRow < end; nextRow++) {
       if (!this.isRowCommented(nextRow)) break
       endRow = nextRow
+      if (existenceOnly) break
     }
 
     return endRow
   }
 
-  endRowForCodeFoldAtRow (row, tabLength) {
+  endRowForCodeFoldAtRow (row, tabLength, existenceOnly) {
     let foldEndRow
     const line = this.buffer.lineForRow(row)
     if (!NON_WHITESPACE_REGEX.test(line)) return
@@ -801,6 +812,7 @@ class TokenizedBuffer {
         break
       }
       foldEndRow = nextRow
+      if (existenceOnly) break
     }
     return foldEndRow
   }
