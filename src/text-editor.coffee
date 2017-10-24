@@ -3247,12 +3247,13 @@ class TextEditor extends Model
   # corresponding clipboard selection text.
   #
   # * `options` (optional) See {Selection::insertText}.
-  pasteText: (options={}) ->
+  pasteText: (options) ->
+    options = Object.assign({}, options)
     {text: clipboardText, metadata} = @constructor.clipboard.readWithMetadata()
     return false unless @emitWillInsertTextEvent(clipboardText)
 
     metadata ?= {}
-    options.autoIndent = @shouldAutoIndentOnPaste()
+    options.autoIndent ?= @shouldAutoIndentOnPaste()
 
     @mutateSelectedText (selection, index) =>
       if metadata.selections?.length is @getSelections().length
@@ -3310,8 +3311,8 @@ class TextEditor extends Model
   # level.
   foldCurrentRow: ->
     {row} = @getCursorBufferPosition()
-    range = @tokenizedBuffer.getFoldableRangeContainingPoint(Point(row, Infinity))
-    @displayLayer.foldBufferRange(range)
+    if range = @tokenizedBuffer.getFoldableRangeContainingPoint(Point(row, Infinity))
+      @displayLayer.foldBufferRange(range)
 
   # Essential: Unfold the most recent cursor's row by one level.
   unfoldCurrentRow: ->
