@@ -163,7 +163,7 @@ class AtomWindow extends EventEmitter {
       if (!this.atomApplication.quitting && !this.unloading) {
         event.preventDefault()
         this.unloading = true
-        this.atomApplication.saveState(false)
+        this.atomApplication.saveCurrentWindowOptions(false)
         if (await this.prepareToUnload()) this.close()
       }
     })
@@ -186,14 +186,14 @@ class AtomWindow extends EventEmitter {
       if (chosen === 0) this.browserWindow.destroy()
     })
 
-    this.browserWindow.webContents.on('crashed', () => {
+    this.browserWindow.webContents.on('crashed', async () => {
       if (this.headless) {
         console.log('Renderer process crashed, exiting')
         this.atomApplication.exit(100)
         return
       }
 
-      this.fileRecoveryService.didCrashWindow(this)
+      await this.fileRecoveryService.didCrashWindow(this)
       const chosen = dialog.showMessageBox(this.browserWindow, {
         type: 'warning',
         buttons: ['Close Window', 'Reload', 'Keep It Open'],
@@ -415,7 +415,7 @@ class AtomWindow extends EventEmitter {
     this.representedDirectoryPaths.sort()
     this.loadSettings.initialPaths = this.representedDirectoryPaths
     this.browserWindow.loadSettingsJSON = JSON.stringify(this.loadSettings)
-    return this.atomApplication.saveState()
+    return this.atomApplication.saveCurrentWindowOptions()
   }
 
   didClosePathWithWaitSession (path) {
