@@ -149,7 +149,6 @@ class AtomApplication extends EventEmitter {
       this.config.set('core.titleBar', 'custom')
     }
 
-    process.nextTick(() => this.autoUpdateManager.initialize())
     this.applicationMenu = new ApplicationMenu(this.version, this.autoUpdateManager)
     this.atomProtocolHandler = new AtomProtocolHandler(this.resourcePath, this.safeMode)
 
@@ -172,6 +171,7 @@ class AtomApplication extends EventEmitter {
     if (!this.configFilePromise) {
       this.configFilePromise = this.configFile.watch()
       this.disposable.add(await this.configFilePromise)
+      this.autoUpdateManager.initialize()
       this.config.onDidChange('core.titleBar', this.promptForRestart.bind(this))
     }
 
@@ -204,7 +204,6 @@ class AtomApplication extends EventEmitter {
 
   openWithOptions (options) {
     const {
-      projectSpecification,
       initialPaths,
       pathsToOpen,
       executedFrom,
@@ -259,7 +258,6 @@ class AtomApplication extends EventEmitter {
         profileStartup,
         clearWindowState,
         addToLastWindow,
-        projectSpecification,
         env
       })
     } else if (urlsToOpen.length > 0) {
@@ -829,7 +827,6 @@ class AtomApplication extends EventEmitter {
     window,
     clearWindowState,
     addToLastWindow,
-    projectSpecification,
     env
   } = {}) {
     if (!pathsToOpen || pathsToOpen.length === 0) return
@@ -863,7 +860,7 @@ class AtomApplication extends EventEmitter {
     }
 
     let openedWindow
-    if (existingWindow && (projectSpecification == null || projectSpecification.config == null)) {
+    if (existingWindow) {
       openedWindow = existingWindow
       openedWindow.openLocations(locationsToOpen)
       if (openedWindow.isMinimized()) {
@@ -899,7 +896,6 @@ class AtomApplication extends EventEmitter {
         windowDimensions,
         profileStartup,
         clearWindowState,
-        projectSpecification,
         env
       })
       this.addWindow(openedWindow)
