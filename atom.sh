@@ -59,6 +59,9 @@ if [ $REDIRECT_STDERR ]; then
   exec 2> /dev/null
 fi
 
+ATOM_HOME="${ATOM_HOME:-$HOME/.atom}"
+mkdir -p "$ATOM_HOME"
+
 if [ $OS == 'Mac' ]; then
   if [ -L "$0" ]; then
     SCRIPT="$(readlink "$0")"
@@ -119,9 +122,6 @@ elif [ $OS == 'Linux' ]; then
       ;;
   esac
 
-  ATOM_HOME="${ATOM_HOME:-$HOME/.atom}"
-  mkdir -p "$ATOM_HOME"
-
   : ${TMPDIR:=/tmp}
 
   [ -x "$ATOM_PATH" ] || ATOM_PATH="$TMPDIR/atom-build/Atom/atom"
@@ -146,17 +146,20 @@ on_die() {
 }
 trap 'on_die' SIGQUIT SIGTERM
 
-# If the wait flag is set, don't exit this process until Atom tells it to.
+# If the wait flag is set, don't exit this process until Atom kills it.
 if [ $WAIT ]; then
   WAIT_FIFO="$ATOM_HOME/.wait_fifo"
-  while true; do
-    [ -f "$WAIT_FIFO" ] && rm "$WAIT_FIFO"
-    [ ! -p "$WAIT_FIFO" ] && mkfifo "$WAIT_FIFO"
-    read < "$WAIT_FIFO" || break
-    sleep 1 # prevent a tight loop
-  done
-  
-  # fall back to sleep
+
+  if [ ! -p "$WAIT_FIFO" ]; then
+    rm -f "$WAIT_FIFO"
+    mkfifo "$WAIT_FIFO"
+  fi
+
+  # Block endlessly by reading from a named pipe.
+  exec 2>/dev/null
+  read < "$WAIT_FIFO"
+
+  # If the read completes for some reason, fall back to sleeping in a loop.
   while true; do
     sleep 1
   done
