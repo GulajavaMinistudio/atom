@@ -311,7 +311,7 @@ const schemaEnforcers = {}
 // * **bold** - `**bold**`
 // * *italics* - `*italics*`
 // * [links](https://atom.io) - `[links](https://atom.io)`
-// * `code spans` - `\`code spans\``
+// * `code spans` - `` `code spans` ``
 // * line breaks - `line breaks<br/>`
 // * ~~strikethrough~~ - `~~strikethrough~~`
 //
@@ -823,21 +823,7 @@ class Config {
   }
 
   getLegacyScopeDescriptorForNewScopeDescriptor (scopeDescriptor) {
-    scopeDescriptor = ScopeDescriptor.fromObject(scopeDescriptor)
-    const legacyAlias = this.legacyScopeAliases.get(scopeDescriptor.scopes[0])
-    if (legacyAlias) {
-      const scopes = scopeDescriptor.scopes.slice()
-      scopes[0] = legacyAlias
-      return new ScopeDescriptor({scopes})
-    }
-  }
-
-  setLegacyScopeAliasForNewScope (languageId, legacyScopeName) {
-    this.legacyScopeAliases.set(languageId, legacyScopeName)
-  }
-
-  removeLegacyScopeAliasForNewScope (languageId) {
-    this.legacyScopeAliases.delete(languageId)
+    return null
   }
 
   /*

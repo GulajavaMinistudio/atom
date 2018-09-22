@@ -6,9 +6,8 @@ module.exports =
 class TreeSitterGrammar {
   constructor (registry, filePath, params) {
     this.registry = registry
-    this.id = params.id
     this.name = params.name
-    this.legacyScopeName = params.legacyScopeName
+    this.scopeName = params.scopeName
 
     // TODO - Remove the `RegExp` spelling and only support `Regex`, once all of the existing
     // Tree-sitter grammars are updated to spell it `Regex`.
@@ -26,7 +25,7 @@ class TreeSitterGrammar {
 
     const scopeSelectors = {}
     for (const key in params.scopes || {}) {
-      const classes = toSyntaxClasses(params.scopes[key])
+      const classes = preprocessScopes(params.scopes[key])
       const selectors = key.split(/,\s+/)
       for (let selector of selectors) {
         selector = selector.trim()
@@ -52,28 +51,35 @@ class TreeSitterGrammar {
     })
 
     this.languageModule = require(languageModulePath)
-    this.scopesById = new Map()
-    this.idsByScope = {}
+    this.classNamesById = new Map()
+    this.scopeNamesById = new Map()
+    this.idsByScope = Object.create(null)
     this.nextScopeId = 256 + 1
     this.registration = null
   }
 
-  idForScope (scope) {
-    let id = this.idsByScope[scope]
+  inspect () {
+    return `TreeSitterGrammar {scopeName: ${this.scopeName}}`
+  }
+
+  idForScope (scopeName) {
+    let id = this.idsByScope[scopeName]
     if (!id) {
       id = this.nextScopeId += 2
-      this.idsByScope[scope] = id
-      this.scopesById.set(id, scope)
+      const className = scopeName.split('.').map(s => `syntax--${s}`).join(' ')
+      this.idsByScope[scopeName] = id
+      this.classNamesById.set(id, className)
+      this.scopeNamesById.set(id, scopeName)
     }
     return id
   }
 
   classNameForScopeId (id) {
-    return this.scopesById.get(id)
+    return this.classNamesById.get(id)
   }
 
-  get scopeName () {
-    return this.id
+  scopeNameForScopeId (id) {
+    return this.scopeNamesById.get(id)
   }
 
   activate () {
@@ -85,17 +91,14 @@ class TreeSitterGrammar {
   }
 }
 
-const toSyntaxClasses = scopes =>
-  typeof scopes === 'string'
-    ? scopes
-      .split('.')
-      .map(s => `syntax--${s}`)
-      .join(' ')
-    : Array.isArray(scopes)
-    ? scopes.map(toSyntaxClasses)
-    : scopes.match
-    ? {match: new RegExp(scopes.match), scopes: toSyntaxClasses(scopes.scopes)}
-    : Object.assign({}, scopes, {scopes: toSyntaxClasses(scopes.scopes)})
+const preprocessScopes = value =>
+  typeof value === 'string'
+    ? value
+    : Array.isArray(value)
+    ? value.map(preprocessScopes)
+    : value.match
+    ? {match: new RegExp(value.match), scopes: preprocessScopes(value.scopes)}
+    : Object.assign({}, value, {scopes: preprocessScopes(value.scopes)})
 
 const NODE_NAME_REGEX = /[\w_]+/
 

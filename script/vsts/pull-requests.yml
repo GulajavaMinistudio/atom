@@ -1,8 +1,13 @@
 trigger: none  # No CI builds, only PR builds
 
-phases:
+resources:
+  containers:
+  - container: atom-linux-ci
+    image: daviwil/atom-linux-ci:latest
 
-- phase: GetReleaseVersion
+jobs:
+
+- job: GetReleaseVersion
   steps:
   # This has to be done separately because VSTS inexplicably
   # exits the script block after `npm install` completes.
