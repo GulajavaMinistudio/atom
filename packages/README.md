@@ -21,13 +21,13 @@ See [RFC 003](https://github.com/atom/atom/blob/master/docs/rfcs/003-consolidate
 | **autoflow** | [`atom/autoflow`](./autoflow) | [#17833](https://github.com/atom/atom/issues/17833) |
 | **autosave** | [`atom/autosave`][autosave] | [#17834](https://github.com/atom/atom/issues/17834) |
 | **background-tips** | [`atom/background-tips`][background-tips] | [#17835](https://github.com/atom/atom/issues/17835) |
-| **base16-tomorrow-dark-theme** | [`atom/base16-tomorrow-dark-theme`][base16-tomorrow-dark-theme] | [#17836](https://github.com/atom/atom/issues/17836) |
-| **base16-tomorrow-light-theme** | [`atom/base16-tomorrow-light-theme`][base16-tomorrow-light-theme] | [#17837](https://github.com/atom/atom/issues/17837) |
+| **base16-tomorrow-dark-theme** | [`./base16-tomorrow-dark-theme`](./base16-tomorrow-dark-theme) | [#17836](https://github.com/atom/atom/issues/17836) |
+| **base16-tomorrow-light-theme** | [`./base16-tomorrow-light-theme`](./base16-tomorrow-light-theme) | [#17837](https://github.com/atom/atom/issues/17837) |
 | **bookmarks** | [`atom/bookmarks`][bookmarks] |  |
 | **bracket-matcher** | [`atom/bracket-matcher`][bracket-matcher] |  |
 | **command-palette** | [`atom/command-palette`][command-palette] |  |
-| **dalek** | [`atom/dalek`][dalek] | [#17838](https://github.com/atom/atom/issues/17838) |
-| **deprecation-cop** | [`atom/deprecation-cop`][deprecation-cop] | [#17839](https://github.com/atom/atom/issues/17839) |
+| **dalek** | [`./dalek`](./dalek) | [#17838](https://github.com/atom/atom/issues/17838) |
+| **deprecation-cop** | [`./deprecation-cop`](./deprecation-cop) | [#17839](https://github.com/atom/atom/issues/17839) |
 | **dev-live-reload** | [`./dev-live-reload`](dev-live-reload) | [#17840](https://github.com/atom/atom/issues/17840) |
 | **encoding-selector** | [`atom/encoding-selector`][encoding-selector] | [#17841](https://github.com/atom/atom/issues/17841) |
 | **exception-reporting** | [`./exception-reporting`](./exception-reporting) | [#17842](https://github.com/atom/atom/issues/17842) |
@@ -108,13 +108,9 @@ See [RFC 003](https://github.com/atom/atom/blob/master/docs/rfcs/003-consolidate
 [autocomplete-snippets]: https://github.com/atom/autocomplete-snippets
 [autosave]: https://github.com/atom/autosave
 [background-tips]: https://github.com/atom/background-tips
-[base16-tomorrow-dark-theme]: https://github.com/atom/base16-tomorrow-dark-theme
-[base16-tomorrow-light-theme]: https://github.com/atom/base16-tomorrow-light-theme
 [bookmarks]: https://github.com/atom/bookmarks
 [bracket-matcher]: https://github.com/atom/bracket-matcher
 [command-palette]: https://github.com/atom/command-palette
-[dalek]: https://github.com/atom/dalek
-[deprecation-cop]: https://github.com/atom/deprecation-cop
 [encoding-selector]: https://github.com/atom/encoding-selector
 [find-and-replace]: https://github.com/atom/find-and-replace
 [fuzzy-finder]: https://github.com/atom/fuzzy-finder
