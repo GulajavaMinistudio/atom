@@ -18,7 +18,7 @@ See [RFC 003](https://github.com/atom/atom/blob/master/docs/rfcs/003-consolidate
 | **autocomplete-html** | [`atom/autocomplete-html`][autocomplete-html] |  |
 | **autocomplete-plus** | [`atom/autocomplete-plus`][autocomplete-plus] |  |
 | **autocomplete-snippets** | [`atom/autocomplete-snippets`][autocomplete-snippets] |  |
-| **autoflow** | [`atom/autoflow`](./autoflow) | [#17833](https://github.com/atom/atom/issues/17833) |
+| **autoflow** | [`./autoflow`](./autoflow) | [#17833](https://github.com/atom/atom/issues/17833) |
 | **autosave** | [`atom/autosave`][autosave] | [#17834](https://github.com/atom/atom/issues/17834) |
 | **background-tips** | [`atom/background-tips`][background-tips] | [#17835](https://github.com/atom/atom/issues/17835) |
 | **base16-tomorrow-dark-theme** | [`./base16-tomorrow-dark-theme`](./base16-tomorrow-dark-theme) | [#17836](https://github.com/atom/atom/issues/17836) |
@@ -35,7 +35,7 @@ See [RFC 003](https://github.com/atom/atom/blob/master/docs/rfcs/003-consolidate
 | **fuzzy-finder** | [`atom/fuzzy-finder`][fuzzy-finder] |  |
 | **github** | [`atom/github`][github] |  |
 | **git-diff** | [`./git-diff`](./git-diff) | [#17843](https://github.com/atom/atom/issues/17843) |
-| **go-to-line** | [`atom/go-to-line`][go-to-line] | [#17844](https://github.com/atom/atom/issues/17844) |
+| **go-to-line** | [`./go-to-line`](./go-to-line) | [#17844](https://github.com/atom/atom/issues/17844) |
 | **grammar-selector** | [`atom/grammar-selector`][grammar-selector] | [#17845](https://github.com/atom/atom/issues/17845) |
 | **image-view** | [`atom/image-view`][image-view] |  |
 | **incompatible-packages** | [`./incompatible-packages`](./incompatible-packages) | [#17846](https://github.com/atom/atom/issues/17846) |
@@ -73,7 +73,7 @@ See [RFC 003](https://github.com/atom/atom/blob/master/docs/rfcs/003-consolidate
 | **language-typescript** | [`atom/language-typescript`][language-typescript] |  |
 | **language-xml** | [`atom/language-xml`][language-xml] |  |
 | **language-yaml** | [`atom/language-yaml`][language-yaml] |  |
-| **line-ending-selector** | [`atom/line-ending-selector`][line-ending-selector] | [#17847](https://github.com/atom/atom/issues/17847) |
+| **line-ending-selector** | [`./packages/line-ending-selector`](./line-ending-selector) | [#17847](https://github.com/atom/atom/issues/17847) |
 | **link** | [`./link`](./link) | [#17848](https://github.com/atom/atom/issues/17848) |
 | **markdown-preview** | [`atom/markdown-preview`][markdown-preview] |  |
 | **metrics** | [`atom/metrics`][metrics] |  |
@@ -115,7 +115,6 @@ See [RFC 003](https://github.com/atom/atom/blob/master/docs/rfcs/003-consolidate
 [find-and-replace]: https://github.com/atom/find-and-replace
 [fuzzy-finder]: https://github.com/atom/fuzzy-finder
 [github]: https://github.com/atom/github
-[go-to-line]: https://github.com/atom/go-to-line
 [grammar-selector]: https://github.com/atom/grammar-selector
 [image-view]: https://github.com/atom/image-view
 [keybinding-resolver]: https://github.com/atom/keybinding-resolver
@@ -152,7 +151,6 @@ See [RFC 003](https://github.com/atom/atom/blob/master/docs/rfcs/003-consolidate
 [language-typescript]: https://github.com/atom/language-typescript
 [language-xml]: https://github.com/atom/language-xml
 [language-yaml]: https://github.com/atom/language-yaml
-[line-ending-selector]: https://github.com/atom/line-ending-selector
 [markdown-preview]: https://github.com/atom/markdown-preview
 [metrics]: https://github.com/atom/metrics
 [notifications]: https://github.com/atom/notifications
