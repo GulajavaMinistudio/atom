@@ -663,6 +663,10 @@ describe('AtomApplication', function () {
             parseCommandLine([path.join(makeTempDir('a'), 'file-a')])
           )
           await focusWindow(window)
+
+          // Choosing "Don't save"
+          mockElectronShowMessageBox({ response: 2 })
+
           window.close()
           await window.closedPromise
           await atomApplication.lastBeforeQuitPromise
@@ -675,6 +679,10 @@ describe('AtomApplication', function () {
             parseCommandLine([path.join(makeTempDir('a'), 'file-a')])
           )
           await focusWindow(window)
+
+          // Choosing "Don't save"
+          mockElectronShowMessageBox({ response: 2 })
+
           window.close()
           await window.closedPromise
           await timeoutPromise(1000)
@@ -992,6 +1000,10 @@ describe('AtomApplication', function () {
         params
       )
     )
+
+    // Make sure that the app does not get updated automatically.
+    atomApplication.config.set('core.automaticallyUpdate', false)
+
     atomApplicationsToDestroy.push(atomApplication)
     return atomApplication
   }
